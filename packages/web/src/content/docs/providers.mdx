@@ -173,6 +173,67 @@ Or if you already have an API key, you can select **Manually enter API Key** and
 
 ---
 
+### Claude Agent SDK
+
+If you want OpenCode to run through Anthropic's official Claude Code runtime, pick the `anthropic-agent` provider. It proxies every request through `@anthropic-ai/claude-agent-sdk`, so the agent can read files, execute slash commands, and honor the same permission prompts as the standalone CLI.
+
+1. Export `ANTHROPIC_API_KEY` (or `CLAUDE_CODE_AUTH_TOKEN`) in your shell so the SDK can authenticate.
+2. Point your config at the provider and model you want:
+
+```jsonc title="opencode.jsonc"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "anthropic-agent": {
+      "options": {
+        "cwd": ".",
+        "permissionMode": "default"
+      }
+    }
+  },
+  "model": "anthropic-agent/sonnet"
+}
+```
+
+- `cwd` defaults to your project root. Override it if you need the agent to run from a different directory.
+- Any field supported by the Claude Agent SDK (`maxThinkingTokens`, `allowedTools`, etc.) can be set under `provider.anthropic-agent.options` or per-request via `providerOptions.anthropic-agent`.
+
+This provider currently emits the final response once the Claude agent finishes a turn, so you get feature parity with Claude Code while staying inside OpenCode.
+
+---
+
+### Codex SDK
+
+OpenAI's Codex CLI is also wrapped in a provider so you can drive it from OpenCode using the `@openai/codex-sdk` TypeScript library.
+
+1. Install Codex locally (`npm i -g @openai/codex` or download from the [Codex docs](https://developers.openai.com/codex/sdk)).
+2. Export `CODEX_API_KEY` (or pass it via your shell) so the SDK can talk to OpenAI.
+3. Point your config at the `codex-agent` provider:
+
+```jsonc title="opencode.jsonc"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "codex-agent": {
+      "options": {
+        "workingDirectory": ".",
+        "sandboxMode": "workspace-write",
+        "skipGitRepoCheck": true
+      }
+    }
+  },
+  "model": "codex-agent/gpt-5-codex"
+}
+```
+
+- `sandboxMode` maps directly to `codex exec --sandbox` (use `read-only`, `workspace-write`, or `danger-full-access`).
+- You can pass any Thread option supported by the Codex SDK (e.g. `approvalPolicy`, `networkAccessEnabled`, `modelReasoningEffort`) under `provider.codex-agent.options`, or tweak them per message via `providerOptions.codex-agent`.
+- Threads are kept per OpenCode session, so `/reset`ting the chat (or setting `providerOptions.codex-agent.reset = true`) starts a fresh Codex conversation.
+
+This gives you the same local-agent UX as running `codex exec`, but with OpenCode's TUI, MCP servers, and toolchain layered on top.
+
+---
+
 ### Azure OpenAI
 
 1. Head over to the [Azure portal](https://portal.azure.com/) and create an **Azure OpenAI** resource. You'll need:

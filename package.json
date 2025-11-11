@@ -53,7 +53,9 @@
     "husky": "9.1.7",
     "prettier": "3.6.2",
     "sst": "3.17.23",
-    "turbo": "2.5.6"
+    "turbo": "2.5.6",
+    "@anthropic-ai/claude-agent-sdk": "0.1.37",
+    "@openai/codex-sdk": "0.57.0"
   },
   "dependencies": {
     "@opencode-ai/script": "workspace:*",

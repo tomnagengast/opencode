@@ -1,0 +1,14 @@
+{
+  "name": "plugin",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ai-sdk/provider": "^2.0.0",
+    "@opencode-ai/plugin": "^1.0.58",
+    "ai": "^5.0.92"
+  }
+}

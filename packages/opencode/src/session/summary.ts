@@ -71,12 +71,15 @@ export namespace SessionSummary {
     }
     await Session.updateMessage(userMsg)
 
-    const assistantMsg = messages.find((m) => m.info.role === "assistant")!.info as MessageV2.Assistant
+    const assistantMsg = messages.find((m) => m.info.role === "assistant")?.info as MessageV2.Assistant | undefined
+    if (!assistantMsg) return
     const small = await Provider.getSmallModel(assistantMsg.providerID)
-    if (!small) return
+    if (!small) {
+      log.info("small model unavailable", { providerID: assistantMsg.providerID })
+    }
 
     const textPart = msgWithParts.parts.find((p) => p.type === "text" && !p.synthetic) as MessageV2.TextPart
-    if (textPart && !userMsg.summary?.title) {
+    if (small && textPart && !userMsg.summary?.title) {
       const result = await generateText({
         maxOutputTokens: small.info.reasoning ? 1500 : 20,
         providerOptions: ProviderTransform.providerOptions(small.npm, small.providerID, {}),
@@ -105,38 +108,41 @@ export namespace SessionSummary {
       await Session.updateMessage(userMsg)
     }
 
-    if (
-      messages.some(
-        (m) =>
-          m.info.role === "assistant" && m.parts.some((p) => p.type === "step-finish" && p.reason !== "tool-calls"),
-      )
-    ) {
-      let summary = messages
-        .findLast((m) => m.info.role === "assistant")
-        ?.parts.findLast((p) => p.type === "text")?.text
-      if (!summary || diffs.length > 0) {
-        const result = await generateText({
-          model: small.language,
-          maxOutputTokens: 100,
-          messages: [
-            {
-              role: "user",
-              content: `
+    const assistantSummaryEligible = messages.some(
+      (m) => m.info.role === "assistant" && m.parts.some((p) => p.type === "step-finish" && p.reason !== "tool-calls"),
+    )
+    if (!assistantSummaryEligible) return
+
+    let summary = messages
+      .findLast((m) => m.info.role === "assistant")
+      ?.parts.findLast((p) => p.type === "text")?.text
+
+    if ((!summary || diffs.length > 0) && small) {
+      const result = await generateText({
+        model: small.language,
+        maxOutputTokens: 100,
+        messages: [
+          {
+            role: "user",
+            content: `
             Summarize the following conversation into 2 sentences MAX explaining what the assistant did and why. Do not explain the user's input. Do not speak in the third person about the assistant.
             <conversation>
             ${JSON.stringify(MessageV2.toModelMessage(messages))}
             </conversation>
             `,
-            },
-          ],
-          headers: small.info.headers,
-        }).catch(() => {})
-        if (result) summary = result.text
-      }
-      userMsg.summary.body = summary
-      log.info("body", { body: summary })
-      await Session.updateMessage(userMsg)
+          },
+        ],
+        headers: small.info.headers,
+      }).catch(() => {})
+      if (result) summary = result.text
     }
+
+    if (!summary && textPart) summary = textPart.text
+    if (!summary) summary = "Response ready."
+
+    userMsg.summary.body = summary
+    log.info("body", { body: summary, providerID: assistantMsg.providerID })
+    await Session.updateMessage(userMsg)
   }
 
   export const diff = fn(
@@ -145,7 +151,19 @@ export namespace SessionSummary {
       messageID: Identifier.schema("message").optional(),
     }),
     async (input) => {
-      return Storage.read<Snapshot.FileDiff[]>(["session_diff", input.sessionID]) ?? []
+      const diffs =
+        (await Storage.read<Snapshot.FileDiff[]>(["session_diff", input.sessionID]).catch(async (error) => {
+          if (error instanceof Storage.NotFoundError) {
+            log.info("session diff missing", { sessionID: input.sessionID })
+            const msgs = await Session.messages({ sessionID: input.sessionID })
+            const next = await computeDiff({ messages: msgs })
+            await Storage.write(["session_diff", input.sessionID], next)
+            log.info("session diff rebuilt", { sessionID: input.sessionID, files: next.length })
+            return next
+          }
+          throw error
+        })) ?? []
+      return diffs
     },
   )
 

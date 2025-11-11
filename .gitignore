@@ -13,3 +13,10 @@ dist
 .turbo
 **/.serena
 .serena/
+
+# codex
+.codex/*
+!.codex/config.toml
+
+# claude
+.claude/settings.local.json

@@ -7,6 +7,7 @@ import { Server } from "../server/server"
 import { BunProc } from "../bun"
 import { Instance } from "../project/instance"
 import { Flag } from "../flag/flag"
+import { createProviderBridge } from "./provider"
 
 export namespace Plugin {
   const log = Log.create({ service: "plugin" })
@@ -19,12 +20,14 @@ export namespace Plugin {
     })
     const config = await Config.get()
     const hooks = []
+    const providers = createProviderBridge()
     const input: PluginInput = {
       client,
       project: Instance.project,
       worktree: Instance.worktree,
       directory: Instance.directory,
       $: Bun.$,
+      providers,
     }
     const plugins = [...(config.plugin ?? [])]
     if (!Flag.OPENCODE_DISABLE_DEFAULT_PLUGINS) {

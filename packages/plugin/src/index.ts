@@ -13,8 +13,10 @@ import type {
 
 import type { BunShell } from "./shell"
 import { type ToolDefinition } from "./tool"
+import type { ProviderRegistry } from "./provider"
 
 export * from "./tool"
+export * from "./provider"
 
 export type PluginInput = {
   client: ReturnType<typeof createOpencodeClient>
@@ -22,6 +24,7 @@ export type PluginInput = {
   directory: string
   worktree: string
   $: BunShell
+  providers: ProviderRegistry
 }
 
 export type Plugin = (input: PluginInput) => Promise<Hooks>

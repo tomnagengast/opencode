@@ -12,15 +12,11 @@ import { Auth } from "../auth"
 import { Instance } from "../project/instance"
 import { Global } from "../global"
 import { Flag } from "../flag/flag"
+import { ProviderPluginRegistry } from "./plugin-registry"
+import type { CustomLoader } from "./loader"
 
 export namespace Provider {
   const log = Log.create({ service: "provider" })
-
-  type CustomLoader = (provider: ModelsDev.Provider) => Promise<{
-    autoload: boolean
-    getModel?: (sdk: any, modelID: string, options?: Record<string, any>) => Promise<any>
-    options?: Record<string, any>
-  }>
 
   type Source = "env" | "config" | "custom" | "api"
 
@@ -214,6 +210,28 @@ export namespace Provider {
     using _ = log.time("state")
     const config = await Config.get()
     const database = await ModelsDev.get()
+    const pluginProviders = ProviderPluginRegistry.list()
+    for (const entry of pluginProviders) {
+      if (!entry.info) {
+        log.info("plugin provider skipped", { providerID: entry.id, reason: "missing-info" })
+        continue
+      }
+      if (database[entry.id]) {
+        log.info("plugin provider skipped", { providerID: entry.id, reason: "already-registered" })
+        continue
+      }
+      database[entry.id] = entry.info
+      const count = Object.keys(entry.info.models).length
+      log.info("plugin provider registered", { providerID: entry.id, models: count })
+    }
+    for (const entry of pluginProviders) {
+      if (!entry.loader) {
+        log.info("plugin loader skipped", { providerID: entry.id })
+        continue
+      }
+      CUSTOM_LOADERS[entry.id] = entry.loader
+      log.info("plugin loader registered", { providerID: entry.id })
+    }
 
     const providers: {
       [providerID: string]: {
@@ -221,6 +239,7 @@ export namespace Provider {
         info: ModelsDev.Provider
         getModel?: (sdk: any, modelID: string, options?: Record<string, any>) => Promise<any>
         options: Record<string, any>
+        skipSDK?: boolean
       }
     } = {}
     const models = new Map<
@@ -244,6 +263,7 @@ export namespace Provider {
       options: Record<string, any>,
       source: Source,
       getModel?: (sdk: any, modelID: string, options?: Record<string, any>) => Promise<any>,
+      skipSDK?: boolean,
     ) {
       const provider = providers[id]
       if (!provider) {
@@ -255,12 +275,14 @@ export namespace Provider {
           info,
           options,
           getModel,
+          skipSDK,
         }
         return
       }
       provider.options = mergeDeep(provider.options, options)
       provider.source = source
       provider.getModel = getModel ?? provider.getModel
+      provider.skipSDK = skipSDK ?? provider.skipSDK
     }
 
     const configProviders = Object.entries(config.provider ?? {})
@@ -348,6 +370,8 @@ export namespace Provider {
         // only include apiKey if there's only one potential option
         provider.env.length === 1 ? { apiKey } : {},
         "env",
+        undefined,
+        undefined,
       )
     }
 
@@ -355,7 +379,7 @@ export namespace Provider {
     for (const [providerID, provider] of Object.entries(await Auth.all())) {
       if (disabled.has(providerID)) continue
       if (provider.type === "api") {
-        mergeProvider(providerID, { apiKey: provider.key }, "api")
+        mergeProvider(providerID, { apiKey: provider.key }, "api", undefined, undefined)
       }
     }
 
@@ -364,7 +388,7 @@ export namespace Provider {
       if (disabled.has(providerID)) continue
       const result = await fn(database[providerID])
       if (result && (result.autoload || providers[providerID])) {
-        mergeProvider(providerID, result.options ?? {}, "custom", result.getModel)
+        mergeProvider(providerID, result.options ?? {}, "custom", result.getModel, result.skipSDK)
       }
     }
 
@@ -390,7 +414,7 @@ export namespace Provider {
       // Load for the main provider if auth exists
       if (auth) {
         const options = await plugin.auth.loader(() => Auth.get(providerID) as any, database[plugin.auth.provider])
-        mergeProvider(plugin.auth.provider, options ?? {}, "custom")
+        mergeProvider(plugin.auth.provider, options ?? {}, "custom", undefined, undefined)
       }
 
       // If this is github-copilot plugin, also register for github-copilot-enterprise if auth exists
@@ -403,7 +427,7 @@ export namespace Provider {
               () => Auth.get(enterpriseProviderID) as any,
               database[enterpriseProviderID],
             )
-            mergeProvider(enterpriseProviderID, enterpriseOptions ?? {}, "custom")
+            mergeProvider(enterpriseProviderID, enterpriseOptions ?? {}, "custom", undefined, undefined)
           }
         }
       }
@@ -411,7 +435,7 @@ export namespace Provider {
 
     // load config
     for (const [providerID, provider] of configProviders) {
-      mergeProvider(providerID, provider.options ?? {}, "config")
+      mergeProvider(providerID, provider.options ?? {}, "config", undefined, undefined)
     }
 
     for (const [providerID, provider] of Object.entries(providers)) {
@@ -525,14 +549,14 @@ export namespace Provider {
     if (!provider) throw new ModelNotFoundError({ providerID, modelID })
     const info = provider.info.models[modelID]
     if (!info) throw new ModelNotFoundError({ providerID, modelID })
-    const sdk = await getSDK(provider.info, info)
+    const sdk = provider.skipSDK ? undefined : await getSDK(provider.info, info)
 
     try {
       const keyReal = `${providerID}/${modelID}`
       const realID = s.realIdByKey.get(keyReal) ?? info.id
       const language = provider.getModel
         ? await provider.getModel(sdk, realID, provider.options)
-        : sdk.languageModel(realID)
+        : sdk!.languageModel(realID)
       log.info("found", { providerID, modelID })
       s.models.set(key, {
         providerID,
