@@ -150,6 +150,13 @@ export namespace ProviderTransform {
         result["reasoningSummary"] = "auto"
       }
     }
+
+    if (providerID === "codex-agent") {
+      result["codex-agent"] = {
+        sessionID,
+      }
+    }
+
     return result
   }
 

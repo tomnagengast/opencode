@@ -34,7 +34,7 @@ export const WebCommand = cmd({
         alias: ["p"],
         type: "number",
         describe: "port to listen on",
-        default: 0,
+        default: 4096,
       })
       .option("hostname", {
         type: "string",

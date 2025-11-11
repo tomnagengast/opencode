@@ -1,4 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-openai-codex-auth"]
+  "provider": {
+    "anthropic-agent": { "options": { "cwd": ".", "skipGitRepoCheck": true } },
+    "codex-agent": { "options": { "workingDirectory": ".", "sandboxMode": "workspace-write" } }
+  },
+  "model": "codex-agent/gpt-5-codex"
 }

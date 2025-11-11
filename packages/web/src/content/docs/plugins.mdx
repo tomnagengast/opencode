@@ -137,3 +137,46 @@ The `tool` helper creates a custom tool that opencode can call. It takes a Zod s
 - `execute`: Function that runs when the tool is called
 
 Your custom tools will be available to opencode alongside built-in tools.
+
+---
+
+### Register providers
+
+If you build a provider integration, register it through the `providers` helper on the plugin context. Supplying metadata plus a loader makes the provider available everywhere (desktop, server, and TUI share the same registry):
+
+```ts title=".opencode/plugin/custom-provider.ts"
+import type { Plugin } from "@opencode-ai/plugin"
+
+export const CustomProvider: Plugin = async ({ providers, directory }) => {
+  providers.register({
+    id: "my-provider",
+    info: {
+      id: "my-provider",
+      name: "My Provider",
+      env: ["MY_PROVIDER_API_KEY"],
+      models: {
+        pro: {
+          id: "pro",
+          name: "My Provider Pro",
+          releaseDate: "2025-01-01T00:00:00.000Z",
+          attachment: true,
+          reasoning: true,
+          temperature: true,
+          toolCall: true,
+          cost: { input: 0, output: 0 },
+          limit: { context: 200_000, output: 8_192 },
+          modalities: { input: ["text"], output: ["text"] },
+        },
+      },
+    },
+    loader: () => ({
+      autoload: false,
+      options: { cwd: directory },
+      getModel: async (_sdk, modelID, options) => {
+        // Return a LanguageModel implementation
+      },
+    }),
+  })
+  return {}
+}
+```
