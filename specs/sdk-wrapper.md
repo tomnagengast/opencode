@@ -25,11 +25,11 @@
 
 ### Completed
 - Created the `packages/ai` workspace with a pluggable adapter interface and default Vercel AI SDK implementation.
-- Added placeholder Claude and Codex adapters so we can wire in alternative SDKs incrementally.
+- Replaced the Claude stub with a real adapter that uses `@anthropic-ai/claude-agent-sdk`’s `query()` API, streams tool events, tracks usage, and surfaces Anthropic provider metadata (including the init payload with tools/agents/slash-commands).
 - Updated every opencode consumer to import from `@opencode-ai/ai`, eliminating direct dependencies on the upstream `ai` package.
-- Documented the new adapter surface in this spec and hooked the package into Turbo's `typecheck` pipeline to keep it verified.
+- Documented the adapter surface in this spec and hooked the package into Turbo's `typecheck` pipeline to keep it verified.
 
 ### Next Steps
-- Implement the real Claude adapter by mapping `@anthropic-ai/claude-agent-sdk`'s `query()` API onto the `generateText`/`generateObject`/`streamText` contract (including tool streaming and usage accounting).
-- Define configuration for selecting adapters (env var + CLI hooks) and expose helper utilities for runtime switching.
-- Expand tests/examples to cover both the default adapter and the Claude implementation once ready.
+- Expose runtime configuration (env flags/CLI) for selecting adapters and add higher-level helpers for switching during tests.
+- Write integration tests or fixtures that exercise the Claude adapter end-to-end (streaming, structured output, provider metadata ingestion).
+- Monitor downstream consumption of the init metadata so the UI/session layers can react to Claude’s advertised tools and slash commands.
