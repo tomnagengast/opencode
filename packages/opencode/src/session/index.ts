@@ -1,6 +1,6 @@
 import { Decimal } from "decimal.js"
 import z from "zod"
-import { type LanguageModelUsage, type ProviderMetadata } from "ai"
+import { type LanguageModelUsage, type ProviderMetadata } from "@opencode/ai"
 
 import { Bus } from "../bus"
 import { Config } from "../config/config"

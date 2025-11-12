@@ -28,7 +28,7 @@ import { Config } from "@/config/config"
 import { MCP } from "@/mcp"
 import { Todo } from "@/session/todo"
 import { z } from "zod"
-import { LoadAPIKeyError } from "ai"
+import { LoadAPIKeyError } from "@opencode/ai"
 import type { OpencodeClient } from "@opencode-ai/sdk"
 
 export namespace ACP {

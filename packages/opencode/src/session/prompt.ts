@@ -19,7 +19,7 @@ import {
   type StreamTextResult,
   stepCountIs,
   jsonSchema,
-} from "ai"
+} from "@opencode/ai"
 import { SessionCompaction } from "./compaction"
 import { SessionLock } from "./lock"
 import { Instance } from "../project/instance"

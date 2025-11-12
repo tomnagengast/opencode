@@ -1,4 +1,4 @@
-import type { ModelMessage } from "ai"
+import type { ModelMessage } from "@opencode/ai"
 import { unique } from "remeda"
 import type { JSONSchema } from "zod/v4/core"
 

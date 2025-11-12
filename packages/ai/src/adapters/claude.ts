@@ -1,0 +1,18 @@
+import type { AIAdapter } from "../types"
+
+function unsupported(feature: string): never {
+  throw new Error(`Claude adapter does not implement ${feature} yet`)
+}
+
+export function createAdapter(): AIAdapter {
+  const failStream = () => unsupported("streamText")
+  const failObject = () => unsupported("generateObject")
+  const failText = () => unsupported("generateText")
+
+  return {
+    id: "claude",
+    generateText: (input) => failText(),
+    generateObject: (input) => failObject(),
+    streamText: (input) => failStream(),
+  }
+}

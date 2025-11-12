@@ -1,4 +1,4 @@
-import { streamText, type ModelMessage, type StreamTextResult, type Tool as AITool } from "ai"
+import { streamText, type ModelMessage, type StreamTextResult, type Tool as AITool } from "@opencode/ai"
 import { Session } from "."
 import { Identifier } from "../id/id"
 import { Instance } from "../project/instance"
