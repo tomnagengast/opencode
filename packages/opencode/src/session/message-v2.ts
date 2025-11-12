@@ -8,7 +8,7 @@ import {
   LoadAPIKeyError,
   type ModelMessage,
   type UIMessage,
-} from "@opencode/ai"
+} from "@opencode-ai/ai"
 import { Identifier } from "../id/id"
 import { LSP } from "../lsp"
 import { Snapshot } from "@/snapshot"

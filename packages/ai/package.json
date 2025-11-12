@@ -1,14 +1,25 @@
 {
-  "name": "@opencode/ai",
+  "name": "@opencode-ai/ai",
   "version": "0.1.0",
+  "description": "Adapter layer for swapping AI provider SDKs inside opencode.",
+  "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "bun x tsc --noEmit -p tsconfig.json"
   },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.1.37",
-    "ai": "catalog:",
-    "typescript": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "ai": "catalog:"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:"
   }
 }

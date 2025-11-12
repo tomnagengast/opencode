@@ -1,4 +1,4 @@
-# @opencode/ai
+# @opencode-ai/ai
 
 Lightweight adapter layer that exposes the subset of the Vercel AI SDK used
 inside `packages/opencode` while allowing the runtime implementation to be
