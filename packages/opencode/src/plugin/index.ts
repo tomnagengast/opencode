@@ -1,4 +1,4 @@
-import type { Hooks, PluginInput, Plugin as PluginInstance } from "@opencode-ai/plugin"
+import type { Hooks, Providers, PluginInput, Plugin as PluginInstance } from "@opencode-ai/plugin"
 import { Config } from "../config/config"
 import { Bus } from "../bus"
 import { Log } from "../util/log"
@@ -19,6 +19,7 @@ export namespace Plugin {
     })
     const config = await Config.get()
     const hooks = []
+    const adapters: Providers[] = []
     const input: PluginInput = {
       client,
       project: Instance.project,
@@ -43,17 +44,21 @@ export namespace Plugin {
       for (const [_name, fn] of Object.entries<PluginInstance>(mod)) {
         const init = await fn(input)
         hooks.push(init)
+        if (init.provider) {
+          adapters.push(...init.provider)
+        }
       }
     }
 
     return {
       hooks,
+      adapters,
       input,
     }
   })
 
   export async function trigger<
-    Name extends Exclude<keyof Required<Hooks>, "auth" | "event" | "tool">,
+    Name extends Exclude<keyof Required<Hooks>, "auth" | "event" | "tool" | "provider">,
     Input = Parameters<Required<Hooks>[Name]>[0],
     Output = Parameters<Required<Hooks>[Name]>[1],
   >(name: Name, input: Input, output: Output): Promise<Output> {
@@ -71,6 +76,10 @@ export namespace Plugin {
 
   export async function list() {
     return state().then((x) => x.hooks)
+  }
+
+  export async function adapters() {
+    return state().then((x) => x.adapters)
   }
 
   export async function init() {

@@ -26,9 +26,66 @@ export type PluginInput = {
 
 export type Plugin = (input: PluginInput) => Promise<Hooks>
 
+export type Providers =
+  | {
+      type: "language-model"
+      id: string
+      displayName: string
+      models: Record<
+        string,
+        {
+          id: string
+          name?: string
+          cost?: {
+            input?: number
+            output?: number
+            cache_read?: number
+            cache_write?: number
+          }
+        }
+      >
+      create: (options: Record<string, any>) => Promise<any>
+    }
+  | {
+      type: "external"
+      id: string
+      displayName: string
+      models: Record<
+        string,
+        {
+          id: string
+          name?: string
+        }
+      >
+      runExternal: (input: {
+        sessionID: string
+        messages: Array<{
+          role: string
+          content: any
+        }>
+        tools: Record<string, any>
+        cwd: string
+        system: string[]
+        options?: Record<string, any>
+      }) => Promise<{
+        logDir?: string
+        threadID?: string
+        taskID?: string
+        text?: string
+        toolCalls?: Array<{
+          id: string
+          tool: string
+          input: any
+          output?: string
+          error?: string
+        }>
+      }>
+    }
+
 export interface Hooks {
   event?: (input: { event: Event }) => Promise<void>
   config?: (input: Config) => Promise<void>
+  provider?: Providers[]
   tool?: {
     [key: string]: ToolDefinition
   }

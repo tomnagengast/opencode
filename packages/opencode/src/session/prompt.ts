@@ -304,6 +304,112 @@ export namespace SessionPrompt {
       await using _ = defer(async () => {
         await processor.end()
       })
+
+      // Handle external providers
+      if ("external" in model && model.external && "runExternal" in model && model.runExternal) {
+        try {
+          log.info("using external provider", { providerID: model.providerID, modelID: model.modelID })
+          const externalResult = await model.runExternal({
+            sessionID: input.sessionID,
+            messages: MessageV2.toModelMessage(msgs),
+            tools,
+            cwd: Instance.directory,
+            system,
+            options: params.options,
+          })
+
+          if (externalResult.logDir) {
+            log.info("external logs", { logDir: externalResult.logDir })
+          }
+          if (externalResult.threadID) {
+            log.info("external thread", { threadID: externalResult.threadID })
+          }
+          if (externalResult.taskID) {
+            log.info("external task", { taskID: externalResult.taskID })
+          }
+
+          // Create text part if text is returned
+          if (externalResult.text) {
+            await Session.updatePart({
+              id: Identifier.ascending("part"),
+              messageID: processor.message.id,
+              sessionID: processor.message.sessionID,
+              type: "text",
+              text: externalResult.text,
+              time: {
+                start: Date.now(),
+                end: Date.now(),
+              },
+            })
+          }
+
+          // Create tool parts for any tool calls
+          if (externalResult.toolCalls) {
+            for (const toolCall of externalResult.toolCalls) {
+              await Session.updatePart({
+                id: Identifier.ascending("part"),
+                messageID: processor.message.id,
+                sessionID: processor.message.sessionID,
+                type: "tool",
+                tool: toolCall.tool,
+                callID: toolCall.id,
+                state: toolCall.error
+                  ? {
+                      status: "error" as const,
+                      input: toolCall.input,
+                      error: toolCall.error,
+                      time: {
+                        start: Date.now(),
+                        end: Date.now(),
+                      },
+                    }
+                  : {
+                      status: "completed" as const,
+                      input: toolCall.input,
+                      output: toolCall.output ?? "",
+                      title: "",
+                      metadata: {},
+                      time: {
+                        start: Date.now(),
+                        end: Date.now(),
+                      },
+                    },
+              })
+            }
+          }
+
+          // Capture message before calling end()
+          const message = processor.message
+          await processor.end()
+          const p = await MessageV2.parts(message.id)
+          const queued = state().queued.get(input.sessionID) ?? []
+          for (const item of queued) {
+            item.callback({ info: message, parts: p })
+          }
+          state().queued.delete(input.sessionID)
+          SessionCompaction.prune(input)
+          return { info: message, parts: p }
+        } catch (e) {
+          log.error("external provider error", { error: e })
+          const error = MessageV2.fromError(e, { providerID: model.providerID })
+          processor.message.error = error
+          // Capture message before calling end()
+          const message = processor.message
+          Bus.publish(Session.Event.Error, {
+            sessionID: message.sessionID,
+            error: message.error,
+          })
+          await processor.end()
+          const p = await MessageV2.parts(message.id)
+          const queued = state().queued.get(input.sessionID) ?? []
+          for (const item of queued) {
+            item.callback({ info: message, parts: p })
+          }
+          state().queued.delete(input.sessionID)
+          return { info: message, parts: p }
+        }
+      }
+
       const doStream = () =>
         streamText({
           onError(error) {
@@ -1818,6 +1924,12 @@ export namespace SessionPrompt {
     if (!isFirst) return
     const small =
       (await Provider.getSmallModel(input.providerID)) ?? (await Provider.getModel(input.providerID, input.modelID))
+
+    // External models cannot be used for title generation
+    if (!small || ("external" in small && small.external)) {
+      return
+    }
+
     const options = {
       ...ProviderTransform.options(small.providerID, small.modelID, input.session.id),
       ...small.info.options,

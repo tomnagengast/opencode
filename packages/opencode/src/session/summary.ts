@@ -73,7 +73,8 @@ export namespace SessionSummary {
 
     const assistantMsg = messages.find((m) => m.info.role === "assistant")!.info as MessageV2.Assistant
     const small = await Provider.getSmallModel(assistantMsg.providerID)
-    if (!small) return
+    // External models cannot be used for summary generation
+    if (!small || ("external" in small && small.external)) return
 
     const textPart = msgWithParts.parts.find((p) => p.type === "text" && !p.synthetic) as MessageV2.TextPart
     if (textPart && !userMsg.summary?.title) {

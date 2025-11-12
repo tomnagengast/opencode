@@ -221,6 +221,8 @@ export namespace Provider {
         info: ModelsDev.Provider
         getModel?: (sdk: any, modelID: string, options?: Record<string, any>) => Promise<any>
         options: Record<string, any>
+        external?: boolean
+        runExternal?: any
       }
     } = {}
     const models = new Map<
@@ -231,6 +233,8 @@ export namespace Provider {
         info: ModelsDev.Model
         language: LanguageModel
         npm?: string
+        external?: boolean
+        runExternal?: any
       }
     >()
     const sdk = new Map<number, SDK>()
@@ -238,6 +242,79 @@ export namespace Provider {
     const realIdByKey = new Map<string, string>()
 
     log.info("init")
+
+    // Load plugin-provided adapters
+    const adapters = await Plugin.adapters()
+    for (const adapter of adapters) {
+      const providerInfo: ModelsDev.Provider = {
+        id: adapter.id,
+        name: adapter.displayName,
+        env: [],
+        models: {},
+      }
+
+      for (const [modelKey, modelInfo] of Object.entries(adapter.models)) {
+        let cost = {
+          input: 0,
+          output: 0,
+          cache_read: 0,
+          cache_write: 0,
+        }
+
+        if (adapter.type === "language-model") {
+          const lmModelInfo = modelInfo as (typeof adapter)["models"][string]
+          if (lmModelInfo.cost) {
+            cost = {
+              input: lmModelInfo.cost.input ?? 0,
+              output: lmModelInfo.cost.output ?? 0,
+              cache_read: lmModelInfo.cost.cache_read ?? 0,
+              cache_write: lmModelInfo.cost.cache_write ?? 0,
+            }
+          }
+        }
+
+        providerInfo.models[modelKey] = {
+          id: modelInfo.id,
+          name: modelInfo.name ?? modelInfo.id,
+          release_date: new Date().toISOString().split("T")[0],
+          attachment: false,
+          reasoning: false,
+          temperature: true,
+          tool_call: true,
+          cost,
+          limit: {
+            context: 0,
+            output: 0,
+          },
+          modalities: {
+            input: ["text"],
+            output: ["text"],
+          },
+          options: {},
+        }
+      }
+
+      database[adapter.id] = providerInfo
+
+      if (adapter.type === "external") {
+        providers[adapter.id] = {
+          source: "custom",
+          info: providerInfo,
+          options: {},
+          external: true,
+          runExternal: adapter.runExternal,
+        }
+      } else {
+        providers[adapter.id] = {
+          source: "custom",
+          info: providerInfo,
+          options: {},
+          getModel: async (_sdk: any, modelID: string, options?: Record<string, any>) => {
+            return adapter.create({ ...options, modelID })
+          },
+        }
+      }
+    }
 
     function mergeProvider(
       id: string,
@@ -525,11 +602,29 @@ export namespace Provider {
     if (!provider) throw new ModelNotFoundError({ providerID, modelID })
     const info = provider.info.models[modelID]
     if (!info) throw new ModelNotFoundError({ providerID, modelID })
+
+    // Handle external providers first, before calling getSDK
+    if (provider.external && provider.runExternal) {
+      log.info("found external provider", { providerID, modelID })
+      const modelData = {
+        providerID,
+        modelID,
+        info,
+        language: {} as LanguageModel, // placeholder for external
+        npm: info.provider?.npm ?? provider.info.npm,
+        external: true,
+        runExternal: provider.runExternal,
+      }
+      s.models.set(key, modelData)
+      return modelData
+    }
+
     const sdk = await getSDK(provider.info, info)
 
     try {
       const keyReal = `${providerID}/${modelID}`
       const realID = s.realIdByKey.get(keyReal) ?? info.id
+
       const language = provider.getModel
         ? await provider.getModel(sdk, realID, provider.options)
         : sdk.languageModel(realID)

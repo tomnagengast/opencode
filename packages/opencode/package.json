@@ -87,5 +87,9 @@
     "yargs": "18.0.0",
     "zod": "catalog:",
     "zod-to-json-schema": "3.24.5"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "*",
+    "@openai/codex-sdk": "*"
   }
 }

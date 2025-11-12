@@ -102,6 +102,39 @@ export namespace SessionCompaction {
     })
     const toSummarize = await MessageV2.filterCompacted(MessageV2.stream(input.sessionID))
     const model = await Provider.getModel(input.providerID, input.modelID)
+
+    // External models cannot be used for compaction
+    if ("external" in model && model.external) {
+      log.warn("external model cannot be used for compaction", { providerID: input.providerID, modelID: input.modelID })
+      return {
+        info: {
+          id: Identifier.ascending("message"),
+          role: "assistant" as const,
+          parentID: toSummarize.findLast((m) => m.info.role === "user")?.info.id!,
+          sessionID: input.sessionID,
+          mode: "build",
+          path: {
+            cwd: Instance.directory,
+            root: Instance.worktree,
+          },
+          summary: true,
+          cost: 0,
+          tokens: {
+            output: 0,
+            input: 0,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+          modelID: input.modelID,
+          providerID: model.providerID,
+          time: {
+            created: Date.now(),
+          },
+        },
+        parts: [],
+      }
+    }
+
     const system = [
       ...SystemPrompt.summarize(model.providerID),
       ...(await SystemPrompt.environment()),
